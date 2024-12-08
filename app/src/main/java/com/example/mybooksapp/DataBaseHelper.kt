@@ -41,7 +41,7 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
     fun getAllBooks(): List<String> {
         val books = mutableListOf<String>()
         val db = this.readableDatabase
-        val cursor = db.rawQuery("SELECT $COLUMN_TITLE FROM $TABLE_NAME", null)
+        val cursor = db.rawQuery("SELECT $COLUMN_ID, $COLUMN_TITLE FROM $TABLE_NAME", null)
         if (cursor.moveToFirst()) {
             do {
                 books.add(cursor.getString(0))
@@ -49,5 +49,9 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
         }
         cursor.close()
         return books
+    }
+
+    fun getBookById() {
+
     }
 }
