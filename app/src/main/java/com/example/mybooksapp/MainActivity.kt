@@ -1,16 +1,18 @@
 package com.example.mybooksapp
 
-import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.widget.ListView
+import android.provider.OpenableColumns
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -28,32 +30,70 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.testa.PdfViewerActivity
+import androidx.compose.foundation.layout.*
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 
 class MainActivity : ComponentActivity() {
     private val viewModel: AppViewModel by viewModels()
 
     private var selectedPdfUri: Uri? = null
-    private lateinit var bookListView: ListView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        deleteDatabase("books.db")
         viewModel.loadBooks()
         setContent {
-            MainScreen(onPickFile = { selectPdfFile() })
+            MainScreen(
+                onPickFile = { selectPdfFile() },
+                onBookClick = { book -> onBookClick(book) } // Передаем обработчик
+            )
         }
     }
 
     private val pdfLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
+        if (result.resultCode == RESULT_OK) {
             selectedPdfUri = result.data?.data
             selectedPdfUri?.let { uri ->
-                val pdfBytes = readPdfFile(uri)
-                //viewModel.addBook()
+                setContent {
+                    //val openDialog = remember { mutableStateOf(true) }
+
+                    AuthorInputDialog(
+                        onConfirm = { author ->
+                            val filePath = uri.toString()
+                            val title = getFileName(uri)
+                            title?.let { Book(0, it, author, filePath) }?.let { viewModel.addBook(it) }
+                            viewModel.loadBooks()
+                        },
+                        onDismiss = {  }
+                    )
+
+                    MainScreen(
+                        onPickFile = { selectPdfFile() },
+                        onBookClick = { book -> onBookClick(book) }
+                    )
+                }
             }
         } else {
             Toast.makeText(this, "Не удалось выбрать файл", Toast.LENGTH_SHORT).show()
         }
+    }
+
+    private fun getFileName(uri: Uri): String? {
+        var name: String? = null
+        val cursor = contentResolver.query(uri, null, null, null, null)
+        cursor?.use {
+            if (it.moveToFirst()) {
+                val nameIndex = it.getColumnIndex(OpenableColumns.DISPLAY_NAME) // Используем getColumnIndex
+                if (nameIndex != -1) {
+                    name = it.getString(nameIndex)
+                }
+            }
+        }
+        return name
     }
 
     private fun selectPdfFile() {
@@ -63,26 +103,72 @@ class MainActivity : ComponentActivity() {
         pdfLauncher.launch(intent)
     }
 
-    private fun readPdfFile(uri: Uri): ByteArray {
-        contentResolver.openInputStream(uri)?.use { inputStream ->
-            return inputStream.readBytes()
-        } ?: throw Exception("Не удалось прочитать файл")
+    fun onBookClick(book: Book) {
+        val intent = Intent(this, PdfViewerActivity::class.java).apply {
+            putExtra("pdfUri", book.filePath) // Передаем путь к файлу
+        }
+        startActivity(intent)
     }
 }
 
 @Composable
-fun MainScreen(viewModel: AppViewModel = viewModel(), onPickFile: () -> Unit) {
+fun AuthorInputDialog(
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var authorName by remember { mutableStateOf("") }
 
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Введите имя автора") },
+        text = {
+            Column {
+                TextField(
+                    value = authorName,
+                    onValueChange = { authorName = it },
+                    label = { Text("Автор") }
+                )
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (authorName.isNotBlank()) {
+                        onConfirm(authorName)
+                    }
+                }
+            ) {
+                Text("Сохранить")
+            }
+        },
+        dismissButton = {
+            Button(onClick = onDismiss) {
+                Text("Отмена")
+            }
+        }
+    )
+}
+
+@Composable
+fun MainScreen(
+    viewModel: AppViewModel = viewModel(),
+    onPickFile: () -> Unit,
+    onBookClick: (Book) -> Unit,
+) {
     val books by viewModel.books.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     Column(
-        modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.Center,
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)/*.weight(1f)*/,
+        verticalArrangement = Arrangement.spacedBy(8.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Поле ввода для поиска
         SearchBar(searchQuery, viewModel)
-        BooksList(books)
+        BooksList(books, onBookClick = onBookClick, modifier = Modifier) // Передаем onBookClick
+        if (books.isEmpty()) {
+            Text("Книг не существует в этой вселенной")
+        }
         Button(
             onClick = onPickFile
         ) {
@@ -106,23 +192,28 @@ private fun SearchBar(searchQuery: String, viewModel: AppViewModel) {
 }
 
 @Composable
-fun BooksList(books: List<String>) {
+fun BooksList(books: List<Book>, onBookClick: (Book) -> Unit, modifier: Modifier = Modifier) {
     LazyColumn(
-        modifier = Modifier.fillMaxSize()
+        modifier = modifier
+            .fillMaxWidth()
+            .horizontalScroll(ScrollState(0))
     ) {
-        items(books) { bookTitle ->
-            Text(
-                text = bookTitle,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp)
-            )
-            /*Button(modifier = Modifier.fillMaxSize(),
-                onClick = )*/
+        items(books) { book ->
+            BookInfo(book, onClick = onBookClick) // Передаем обработчик клика
         }
     }
 }
 
-fun getBookById() {
-
+@Composable
+fun BookInfo(book: Book, onClick: (Book) -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp)
+            .clickable { onClick(book) } // Передаем событие клика с книгой
+    ) {
+        Text("${book.id}")
+        Text(book.author)
+        Text(book.title)
+    }
 }
