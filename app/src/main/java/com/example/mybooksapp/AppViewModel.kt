@@ -11,13 +11,14 @@ import kotlinx.coroutines.launch
 
 class AppViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val _books = MutableStateFlow<List<String>>(emptyList())
-    val books: StateFlow<List<String>> = _books.asStateFlow()
+    private val _books = MutableStateFlow<List<Book>>(emptyList())
+    val books: StateFlow<List<Book>> = _books.asStateFlow()
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
-    var databaseHelper = DatabaseHelper(application.applicationContext)
+    private var databaseHelper = MutableStateFlow<DatabaseHelper>(DatabaseHelper(application.applicationContext))
+    val helper: StateFlow<DatabaseHelper> = databaseHelper.asStateFlow()
 
     init {
         // Загрузка всех книг при инициализации ViewModel
@@ -26,7 +27,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun loadBooks() {
         viewModelScope.launch(Dispatchers.IO) {
-            val allBooks = databaseHelper.getAllBooks()
+            val allBooks = helper.value.getAllBooks()
             _books.value = allBooks
         }
     }
@@ -38,19 +39,20 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun filterBooks(query: String) {
         viewModelScope.launch(Dispatchers.IO) {
-            val allBooks = databaseHelper.getAllBooks()
+            val allBooks = databaseHelper.value.getAllBooks()
             val filteredBooks = if (query.isBlank()) {
                 allBooks
             } else {
-                allBooks.filter { it.contains(query, ignoreCase = true) }
+                allBooks.filter { it.title.contains(query, ignoreCase = true) }
             }
             _books.value = filteredBooks
         }
     }
 
-    fun addBook(title: String, pdfBytes: ByteArray) {
+    fun addBook(book: Book) {
         viewModelScope.launch(Dispatchers.IO) {
-            databaseHelper.addBook(title, pdfBytes)
+            databaseHelper.value.addBook(book)
+            loadBooks()
         }
     }
 }

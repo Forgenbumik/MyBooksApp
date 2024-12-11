@@ -13,12 +13,13 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
         private const val TABLE_NAME = "books"
         private const val COLUMN_ID = "id"
         private const val COLUMN_TITLE = "title"
-        private const val COLUMN_PDF = "pdf"
+        private const val COLUMN_AUTHOR = "author"
+        private const val COLUMN_FILE_PATH = "file_path"
     }
 
     override fun onCreate(db: SQLiteDatabase) {
         val createTable = ("CREATE TABLE $TABLE_NAME ($COLUMN_ID INTEGER PRIMARY KEY AUTOINCREMENT, "
-                + "$COLUMN_TITLE TEXT, $COLUMN_PDF BLOB)")
+                + "$COLUMN_TITLE TEXT, $COLUMN_AUTHOR TEXT, $COLUMN_FILE_PATH TEXT)")
         db.execSQL(createTable)
     }
 
@@ -28,30 +29,32 @@ class DatabaseHelper(context: Context) : SQLiteOpenHelper(context, DATABASE_NAME
     }
 
     // Метод для добавления книги
-    fun addBook(title: String, pdf: ByteArray) {
+    fun addBook(book: Book) {
         val db = this.writableDatabase
         val values = ContentValues().apply {
-            put(COLUMN_TITLE, title)
-            put(COLUMN_PDF, pdf)
+            put(COLUMN_TITLE, book.title)
+            put(COLUMN_AUTHOR, book.author)
+            put(COLUMN_FILE_PATH, book.filePath)
         }
         db.insert(TABLE_NAME, null, values)
     }
 
-    // Метод для получения всех названий книг
-    fun getAllBooks(): List<String> {
-        val books = mutableListOf<String>()
+    // Метод для получения всех книг
+    fun getAllBooks(): List<Book> {
+        val books = mutableListOf<Book>()
         val db = this.readableDatabase
-        val cursor = db.rawQuery("SELECT $COLUMN_ID, $COLUMN_TITLE FROM $TABLE_NAME", null)
+        val cursor = db.rawQuery("SELECT * FROM $TABLE_NAME", null)
+
         if (cursor.moveToFirst()) {
             do {
-                books.add(cursor.getString(0))
+                val id = cursor.getLong(cursor.getColumnIndexOrThrow(COLUMN_ID))
+                val title = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_TITLE))
+                val author = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_AUTHOR))
+                val filePath = cursor.getString(cursor.getColumnIndexOrThrow(COLUMN_FILE_PATH))
+                books.add(Book(id, title, author, filePath))
             } while (cursor.moveToNext())
         }
         cursor.close()
         return books
-    }
-
-    fun getBookById() {
-
     }
 }
