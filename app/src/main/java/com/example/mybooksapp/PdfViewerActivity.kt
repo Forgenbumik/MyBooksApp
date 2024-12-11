@@ -4,7 +4,6 @@ import android.graphics.Bitmap
 import android.graphics.pdf.PdfRenderer
 import android.net.Uri
 import android.os.Bundle
-import android.os.ParcelFileDescriptor
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
@@ -32,11 +31,12 @@ class PdfViewerActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         // Получаем URI PDF из Intent
-        val uri: Uri? = intent.getParcelableExtra("pdfUri")
-        uri?.let {
+        val filePath: String? = intent.getStringExtra("pdfUri") // Получаем путь к файлу
+        filePath?.let {
+            val uri = Uri.parse(it) // Преобразуем строку обратно в Uri
             try {
                 // Открываем ParcelFileDescriptor
-                val parcelFileDescriptor = contentResolver.openFileDescriptor(it, "r")
+                val parcelFileDescriptor = contentResolver.openFileDescriptor(uri, "r")
                 parcelFileDescriptor?.let { pfd ->
                     // Создаем PdfRenderer
                     pdfRenderer = PdfRenderer(pfd)
@@ -48,6 +48,11 @@ class PdfViewerActivity : ComponentActivity() {
             } catch (e: FileNotFoundException) {
                 e.printStackTrace()
                 // Обработка ошибки: файл не найден
+            }
+        } ?: run {
+            // Обработка случая, когда URI не передан
+            setContent {
+                Text("Ошибка: PDF файл не найден.")
             }
         }
     }
@@ -103,7 +108,7 @@ class PdfViewerActivity : ComponentActivity() {
                         scaleX = scale,
                         scaleY = scale,
                         translationX = offsetX,
-                        translationY = offsetY
+                        translationY = offsetY // Применяем смещение
                     )
             )
 
