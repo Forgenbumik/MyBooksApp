@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.testa.PdfViewerActivity
 import androidx.compose.foundation.layout.*
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -59,16 +60,16 @@ class MainActivity : ComponentActivity() {
             selectedPdfUri = result.data?.data
             selectedPdfUri?.let { uri ->
                 setContent {
-                    //val openDialog = remember { mutableStateOf(true) }
+
 
                     AuthorInputDialog(
+                        showDialog = showDialog,
                         onConfirm = { author ->
                             val filePath = uri.toString()
                             val title = getFileName(uri)
                             title?.let { Book(0, it, author, filePath) }?.let { viewModel.addBook(it) }
                             viewModel.loadBooks()
-                        },
-                        onDismiss = {  }
+                        }
                     )
 
                     MainScreen(
@@ -113,40 +114,43 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun AuthorInputDialog(
-    onConfirm: (String) -> Unit,
-    onDismiss: () -> Unit
+    showDialog: MutableState<Boolean>, // Добавляем флаг для отображения диалога
+    onConfirm: (String) -> Unit
 ) {
-    var authorName by remember { mutableStateOf("") }
+    if (showDialog.value) { // Проверяем состояние, чтобы отобразить диалог
+        var authorName by remember { mutableStateOf("") }
 
-    androidx.compose.material3.AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Введите имя автора") },
-        text = {
-            Column {
-                TextField(
-                    value = authorName,
-                    onValueChange = { authorName = it },
-                    label = { Text("Автор") }
-                )
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    if (authorName.isNotBlank()) {
-                        onConfirm(authorName)
-                    }
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { showDialog.value = false }, // Закрываем диалог при запросе
+            title = { Text("Введите имя автора") },
+            text = {
+                Column {
+                    TextField(
+                        value = authorName,
+                        onValueChange = { authorName = it },
+                        label = { Text("Автор") }
+                    )
                 }
-            ) {
-                Text("Сохранить")
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (authorName.isNotBlank()) {
+                            onConfirm(authorName)
+                            showDialog.value = false // Закрываем диалог после подтверждения
+                        }
+                    }
+                ) {
+                    Text("Сохранить")
+                }
+            },
+            dismissButton = {
+                Button(onClick = { showDialog.value = false }) { // Закрываем диалог при нажатии "Отмена"
+                    Text("Отмена")
+                }
             }
-        },
-        dismissButton = {
-            Button(onClick = onDismiss) {
-                Text("Отмена")
-            }
-        }
-    )
+        )
+    }
 }
 
 @Composable
