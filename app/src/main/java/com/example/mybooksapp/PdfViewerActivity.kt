@@ -1,4 +1,4 @@
-package com.example.testa
+package com.example.mybooksapp
 
 import android.graphics.Bitmap
 import android.graphics.pdf.PdfRenderer
@@ -25,20 +25,16 @@ class PdfViewerActivity : ComponentActivity() {
     private lateinit var pdfRenderer: PdfRenderer
     private var currentPageIndex by mutableStateOf(0)
     private var totalPages by mutableStateOf(0)
-    private var scale by mutableStateOf(1f) // Масштабирование
+    private var scale by mutableStateOf(1f)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Получаем URI PDF из Intent
-        val filePath: String? = intent.getStringExtra("pdfUri") // Получаем путь к файлу
-        filePath?.let {
-            val uri = Uri.parse(it) // Преобразуем строку обратно в Uri
+        val uri: Uri? = intent.getStringExtra("pdfUri")?.let { Uri.parse(it) }
+        uri?.let {
             try {
-                // Открываем ParcelFileDescriptor
-                val parcelFileDescriptor = contentResolver.openFileDescriptor(uri, "r")
+                val parcelFileDescriptor = contentResolver.openFileDescriptor(it, "r")
                 parcelFileDescriptor?.let { pfd ->
-                    // Создаем PdfRenderer
                     pdfRenderer = PdfRenderer(pfd)
                     totalPages = pdfRenderer.pageCount
                     setContent {
@@ -47,41 +43,29 @@ class PdfViewerActivity : ComponentActivity() {
                 }
             } catch (e: FileNotFoundException) {
                 e.printStackTrace()
-                // Обработка ошибки: файл не найден
-            }
-        } ?: run {
-            // Обработка случая, когда URI не передан
-            setContent {
-                Text("Ошибка: PDF файл не найден.")
             }
         }
     }
 
     @Composable
     fun PdfViewerScreen() {
-        // Кэшируем битмапы для страниц
         val bitmapCache = remember { mutableStateMapOf<Int, Bitmap>() }
         val page = pdfRenderer.openPage(currentPageIndex)
 
-        // Проверяем, есть ли уже закэшированный битмап
         val bitmap = bitmapCache[currentPageIndex] ?: run {
-            // Увеличиваем разрешение битмапа в зависимости от масштаба
-            val bitmapWidth = (page.width * scale * 2).toInt() // Увеличиваем разрешение в 2 раза
-            val bitmapHeight = (page.height * scale * 2).toInt() // Увеличиваем разрешение в 2 раза
+            val bitmapWidth = (page.width * scale * 2).toInt()
+            val bitmapHeight = (page.height * scale * 2).toInt()
             val newBitmap = Bitmap.createBitmap(bitmapWidth, bitmapHeight, Bitmap.Config.ARGB_8888)
-            // Используем RENDER_MODE_FOR_PRINT для лучшего качества
             page.render(newBitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_PRINT)
-            bitmapCache[currentPageIndex] = newBitmap // Кэшируем битмап
+            bitmapCache[currentPageIndex] = newBitmap
             newBitmap
         }
         page.close()
 
-        // Состояние для хранения смещения
         var offsetX by remember { mutableStateOf(0f) }
         var offsetY by remember { mutableStateOf(0f) }
 
         Box(modifier = Modifier.fillMaxSize()) {
-            // Отображаем изображение с возможностью масштабирования
             Image(
                 bitmap = bitmap.asImageBitmap(),
                 contentDescription = null,
@@ -89,17 +73,14 @@ class PdfViewerActivity : ComponentActivity() {
                     .fillMaxSize()
                     .pointerInput(Unit) {
                         detectTransformGestures { _, pan, zoom, _ ->
-                            scale = min(max(scale * zoom, 1f), 5f) // Ограничиваем масштаб от 1x до 5x
+                            scale = min(max(scale * zoom, 1f), 5f)
 
-                            // Обновляем смещение в зависимости от координат касания
                             offsetX += pan.x
                             offsetY += pan.y
 
-                            // Ограничиваем смещение по X
                             val maxOffsetX = (bitmap.width * scale - size.width).coerceAtLeast(0f)
                             offsetX = offsetX.coerceIn(-maxOffsetX, 0f)
 
-                            // Ограничиваем смещение по Y
                             val maxOffsetY = (bitmap.height * scale - size.height).coerceAtLeast(0f)
                             offsetY = offsetY.coerceIn(-maxOffsetY, 0f)
                         }
@@ -108,11 +89,10 @@ class PdfViewerActivity : ComponentActivity() {
                         scaleX = scale,
                         scaleY = scale,
                         translationX = offsetX,
-                        translationY = offsetY // Применяем смещение
+                        translationY = offsetY
                     )
             )
 
-            // Кнопки для навигации
             Row(
                 modifier = Modifier
                     .padding(16.dp)
@@ -121,15 +101,15 @@ class PdfViewerActivity : ComponentActivity() {
             ) {
                 Button(onClick = { if (currentPageIndex > 0) {
                     currentPageIndex--
-                    bitmapCache.remove(currentPageIndex + 1) // Удаляем кэш следующей страницы
+                    bitmapCache.remove(currentPageIndex + 1)
                 }}) {
-                    Text("<-") // Стрелка влево
+                    Text("<-")
                 }
                 Button(onClick = { if (currentPageIndex < totalPages - 1) {
                     currentPageIndex++
-                    bitmapCache.remove(currentPageIndex - 1) // Удаляем кэш предыдущей страницы
+                    bitmapCache.remove(currentPageIndex - 1)
                 }}) {
-                    Text("->") // Стрелка вправо
+                    Text("->")
                 }
             }
         }
@@ -137,7 +117,8 @@ class PdfViewerActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        // Закрываем PdfRenderer при уничтожении активности
-        pdfRenderer.close()
+        if (::pdfRenderer.isInitialized) {
+            pdfRenderer.close()
+        }
     }
 }
