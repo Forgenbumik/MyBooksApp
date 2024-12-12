@@ -39,45 +39,32 @@ class MainActivity : ComponentActivity() {
     }
 
     private val pdfLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+
         if (result.resultCode == RESULT_OK) {
             selectedPdfUri = result.data?.data
             selectedPdfUri?.let { uri ->
-                val filePath = uri.toString() // Сохраняем путь к файлу
-                val title = "Название книги" // Здесь можно добавить логику для получения названия
-                val author = "Автор книги" // Здесь можно добавить логику для получения автора
-                viewModel.addBook(Book(0, title, author, filePath)) // Сохраняем книгу в базу данных
-                viewModel.loadBooks()
+                val showDialog = mutableStateOf(true)
+                setContent {
+                    AuthorInputDialog(
+                        showDialog = showDialog,
+                        onConfirm = { author ->
+                            val filePath = uri.toString()
+                            val title = getFileName(uri)
+                            title?.let { Book(0, it, author, filePath) }?.let { viewModel.addBook(it) }
+                            viewModel.loadBooks()
+                        }
+                    )
+
+                    MainScreen(
+                        onPickFile = { selectPdfFile() },
+                        onBookClick = { book -> onBookClick(book) }
+                    )
+                }
             }
         } else {
             Toast.makeText(this, "Не удалось выбрать файл", Toast.LENGTH_SHORT).show()
         }
     }
-
-    /*private val pdfLauncher = registerForActivityResult(ActivityResultContracts.OpenDocument()) { result ->
-
-        uri?.let {
-            selectedPdfUri = it
-            val showDialog = mutableStateOf(true)
-            setContent {
-                AuthorInputDialog(
-                    showDialog = showDialog,
-                    onConfirm = { author ->
-                        val filePath = it.toString()
-                        val title = getFileName(it)
-                        title?.let { Book(0, it, author, filePath) }?.let { viewModel.addBook(it) }
-                        viewModel.loadBooks()
-                    }
-                )
-
-                MainScreen(
-                    onPickFile = { selectPdfFile() },
-                    onBookClick = { book -> onBookClick(book) }
-                )
-            }
-        } ?: run {
-            Toast.makeText(this, "Не удалось выбрать файл", Toast.LENGTH_SHORT).show()
-        }
-    }*/
 
     private fun getFileName(uri: Uri): String? {
         var name: String? = null
@@ -92,10 +79,6 @@ class MainActivity : ComponentActivity() {
         }
         return name
     }
-
-    /*private fun selectPdfFile() {
-        pdfLauncher.launch(arrayOf("application/pdf"))
-    }*/
 
     private fun selectPdfFile() {
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
