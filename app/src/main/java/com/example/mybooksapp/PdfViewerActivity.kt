@@ -62,6 +62,7 @@ class PdfViewerActivity : ComponentActivity() {
         }
         page.close()
 
+        var scale by remember { mutableStateOf(1f) }
         var offsetX by remember { mutableStateOf(0f) }
         var offsetY by remember { mutableStateOf(0f) }
 
@@ -73,16 +74,9 @@ class PdfViewerActivity : ComponentActivity() {
                     .fillMaxSize()
                     .pointerInput(Unit) {
                         detectTransformGestures { _, pan, zoom, _ ->
-                            scale = min(max(scale * zoom, 1f), 5f)
-
+                            scale = (scale * zoom).coerceIn(1f, 5f)
                             offsetX += pan.x
                             offsetY += pan.y
-
-                            val maxOffsetX = (bitmap.width * scale - size.width).coerceAtLeast(0f)
-                            offsetX = offsetX.coerceIn(-maxOffsetX, 0f)
-
-                            val maxOffsetY = (bitmap.height * scale - size.height).coerceAtLeast(0f)
-                            offsetY = offsetY.coerceIn(-maxOffsetY, 0f)
                         }
                     }
                     .graphicsLayer(
@@ -99,16 +93,26 @@ class PdfViewerActivity : ComponentActivity() {
                     .fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Button(onClick = { if (currentPageIndex > 0) {
-                    currentPageIndex--
-                    bitmapCache.remove(currentPageIndex + 1)
-                }}) {
+                Button(onClick = {
+                    if (currentPageIndex > 0) {
+                        currentPageIndex--
+                        bitmapCache.remove(currentPageIndex + 1)
+                        scale = 1f
+                        offsetX = 0f
+                        offsetY = 0f
+                    }
+                }) {
                     Text("<-")
                 }
-                Button(onClick = { if (currentPageIndex < totalPages - 1) {
-                    currentPageIndex++
-                    bitmapCache.remove(currentPageIndex - 1)
-                }}) {
+                Button(onClick = {
+                    if (currentPageIndex < totalPages - 1) {
+                        currentPageIndex++
+                        bitmapCache.remove(currentPageIndex - 1)
+                        scale = 1f
+                        offsetX = 0f
+                        offsetY = 0f
+                    }
+                }) {
                     Text("->")
                 }
             }
