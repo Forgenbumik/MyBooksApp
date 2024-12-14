@@ -9,24 +9,41 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Divider
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.mybooksapp.ui.theme.MyBooksAppTheme
+
+enum class Theme{
+    LIGHT, DARK, SYSTEM
+}
 
 class MainActivity : ComponentActivity() {
+
     private val viewModel: AppViewModel by viewModels()
 
     private var selectedPdfUri: Uri? = null
@@ -35,11 +52,12 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         viewModel.loadBooks()
         setContent {
-            MainScreen(
-                onPickFile = { selectPdfFile() },
-                onBookClick = { book -> onBookClick(book) },
-                onDelete = {book -> deleteBook(book) }
-            )
+            MyBooksAppTheme {
+                MainScreen(
+                    onPickFile = { selectPdfFile() },
+                    onBookClick = { book -> onBookClick(book) },
+                    onDelete = {book -> deleteBook(book) })
+            }
         }
     }
 
@@ -173,24 +191,100 @@ fun MainScreen(
     onBookClick: (Book) -> Unit,
     onDelete: (Book) -> Unit
 ) {
+    var currentTheme by remember { mutableStateOf(Theme.SYSTEM) }
     val books by viewModel.books.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
-    Column(
+
+    MyBooksAppTheme(darkTheme = when (currentTheme) {
+        Theme.LIGHT -> false
+        Theme.DARK -> true
+        Theme.SYSTEM -> isSystemInDarkTheme()
+    }) {
+        Scaffold(
+            floatingActionButton = {
+                FloatingActionButton(
+                    onClick = onPickFile,
+                    containerColor = Color(0xFF6A1B9A),
+                    modifier = Modifier.padding(bottom = 32.dp, end=50.dp)
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Добавить PDF-файл", tint = Color.White)
+                }
+            }
+        )
+        { paddingValues ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                SearchBar(searchQuery, viewModel)
+                ThemeSwitcher(
+                    onLightThemeSelected = { currentTheme = Theme.LIGHT },
+                    onDarkThemeSelected = { currentTheme = Theme.DARK },
+                    onSystemThemeSelected = { currentTheme = Theme.SYSTEM },
+                    selectedTheme = currentTheme.name
+                )
+                BooksList(books, onBookClick = onBookClick, onDelete = onDelete, modifier = Modifier)
+                if (books.isEmpty()) {
+                    Text("Книг не существует в этой вселенной")
+                }
+            }
+
+        }
+    }
+
+
+}
+
+@Composable
+fun ThemeSwitcher(
+    onLightThemeSelected: () -> Unit,
+    onDarkThemeSelected: () -> Unit,
+    onSystemThemeSelected: () -> Unit,
+    selectedTheme: String
+) {
+    Row(
         modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
+            .padding(16.dp)
+            .clip(RoundedCornerShape(50))
+            .background(Color.Gray)
+            .height(48.dp)
+            .fillMaxWidth()
     ) {
-        SearchBar(searchQuery, viewModel)
-        BooksList(books, onBookClick = onBookClick, onDelete = onDelete, modifier = Modifier)
-        if (books.isEmpty()) {
-            Text("Книг не существует в этой вселенной")
+        Button(
+            onClick = onLightThemeSelected,
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight(),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = if (selectedTheme == "Light") Color.Yellow else Color.White
+            )
+        ) {
+            Text("Light")
         }
         Button(
-            onClick = onPickFile
+            onClick = onDarkThemeSelected,
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight(),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = if (selectedTheme == "Dark") Color.Yellow else Color.Black
+            )
         ) {
-            Text("Добавить PDF-файл")
+            Text("Dark", color = Color.White)
+        }
+        Button(
+            onClick = onSystemThemeSelected,
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight(),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = if (selectedTheme == "System") Color.Yellow else Color.LightGray
+            )
+        ) {
+            Text("System")
         }
     }
 }
@@ -217,6 +311,7 @@ fun BooksList(books: List<Book>, onBookClick: (Book) -> Unit, onDelete: (Book) -
     ) {
         items(books) { book ->
             BookInfo(book, onClick = onBookClick, onDelete = onDelete)
+            HorizontalDivider() // Добавляем линию после каждого элемента
         }
     }
 }
