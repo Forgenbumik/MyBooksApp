@@ -55,4 +55,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
             loadBooks()
         }
     }
+
+    fun deleteBook(bookId: Long) {
+        viewModelScope.launch(Dispatchers.IO) {
+            databaseHelper.value.deleteBook(bookId)
+            loadBooks()
+        }
+    }
 }

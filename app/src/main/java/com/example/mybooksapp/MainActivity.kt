@@ -13,7 +13,11 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.*
@@ -33,7 +37,8 @@ class MainActivity : ComponentActivity() {
         setContent {
             MainScreen(
                 onPickFile = { selectPdfFile() },
-                onBookClick = { book -> onBookClick(book) }
+                onBookClick = { book -> onBookClick(book) },
+                onDelete = {book -> deleteBook(book) }
             )
         }
     }
@@ -57,7 +62,8 @@ class MainActivity : ComponentActivity() {
 
                     MainScreen(
                         onPickFile = { selectPdfFile() },
-                        onBookClick = { book -> onBookClick(book) }
+                        onBookClick = { book -> onBookClick(book) },
+                        onDelete = {book -> deleteBook(book)}
                     )
                 }
             }
@@ -93,6 +99,29 @@ class MainActivity : ComponentActivity() {
             putExtra("pdfUri", book.filePath)
         }
         startActivity(intent)
+    }
+
+    private fun deleteBook(book: Book) {
+        // Удаляем из базы данных
+        val dbHelper = DatabaseHelper(this)
+        val success = dbHelper.deleteBook(book.id)
+
+        if (success) {
+            // Пробуем удалить файл, если он существует
+            try {
+                val uri = Uri.parse(book.filePath)
+                contentResolver.delete(uri, null, null)
+            } catch (e: Exception) {
+                // Игнорируем ошибки при удалении файла
+            }
+
+            // Обновляем список книг
+            viewModel.loadBooks()
+
+            Toast.makeText(this, "Книга успешно удалена", Toast.LENGTH_SHORT).show()
+        } else {
+            Toast.makeText(this, "Ошибка при удалении книги", Toast.LENGTH_SHORT).show()
+        }
     }
 }
 
@@ -142,6 +171,7 @@ fun MainScreen(
     viewModel: AppViewModel = viewModel(),
     onPickFile: () -> Unit,
     onBookClick: (Book) -> Unit,
+    onDelete: (Book) -> Unit
 ) {
     val books by viewModel.books.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
@@ -153,7 +183,7 @@ fun MainScreen(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         SearchBar(searchQuery, viewModel)
-        BooksList(books, onBookClick = onBookClick, modifier = Modifier)
+        BooksList(books, onBookClick = onBookClick, onDelete = onDelete, modifier = Modifier)
         if (books.isEmpty()) {
             Text("Книг не существует в этой вселенной")
         }
@@ -180,27 +210,38 @@ private fun SearchBar(searchQuery: String, viewModel: AppViewModel) {
 }
 
 @Composable
-fun BooksList(books: List<Book>, onBookClick: (Book) -> Unit, modifier: Modifier = Modifier) {
+fun BooksList(books: List<Book>, onBookClick: (Book) -> Unit, onDelete: (Book) -> Unit, modifier: Modifier = Modifier) {
     LazyColumn(
         modifier = modifier
             .fillMaxWidth()
     ) {
         items(books) { book ->
-            BookInfo(book, onClick = onBookClick)
+            BookInfo(book, onClick = onBookClick, onDelete = onDelete)
         }
     }
 }
 
 @Composable
-fun BookInfo(book: Book, onClick: (Book) -> Unit) {
-    Column(
+fun BookInfo(book: Book, onClick: (Book) -> Unit, onDelete: (Book) -> Unit) {
+    Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(16.dp)
-            .clickable { onClick(book) }
+            .clickable { onClick(book) },
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Text("${book.id}")
-        Text(book.author)
-        Text(book.title)
+        Column(
+            modifier = Modifier.weight(1f) // Занимает доступное пространство
+        ) {
+            Text("${book.id}")
+            Text(book.author)
+            Text(book.title)
+        }
+        IconButton(onClick = { onDelete(book) }) {
+            Icon(
+                imageVector = Icons.Default.Delete, // Использует стандартную иконку удаления
+                contentDescription = "Delete"
+            )
+        }
     }
 }
