@@ -20,8 +20,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Divider
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -33,7 +31,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.mybooksapp.ui.theme.MyBooksAppTheme
@@ -191,14 +192,14 @@ fun MainScreen(
     onBookClick: (Book) -> Unit,
     onDelete: (Book) -> Unit
 ) {
-    var currentTheme by remember { mutableStateOf(Theme.SYSTEM) }
+    val currentTheme by viewModel.currentTheme.collectAsState()
     val books by viewModel.books.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
 
     MyBooksAppTheme(darkTheme = when (currentTheme) {
         Theme.LIGHT -> false
         Theme.DARK -> true
-        Theme.SYSTEM -> isSystemInDarkTheme()
+        Theme.SYSTEM -> false
     }) {
         Scaffold(
             floatingActionButton = {
@@ -221,21 +222,18 @@ fun MainScreen(
             ) {
                 SearchBar(searchQuery, viewModel)
                 ThemeSwitcher(
-                    onLightThemeSelected = { currentTheme = Theme.LIGHT },
-                    onDarkThemeSelected = { currentTheme = Theme.DARK },
-                    onSystemThemeSelected = { currentTheme = Theme.SYSTEM },
-                    selectedTheme = currentTheme.name
+                    onLightThemeSelected = { viewModel.setTheme(Theme.LIGHT) },
+                    onDarkThemeSelected = { viewModel.setTheme(Theme.DARK) },
+                    onSystemThemeSelected = { viewModel.setTheme(Theme.SYSTEM) },
+                    currentTheme = currentTheme
                 )
                 BooksList(books, onBookClick = onBookClick, onDelete = onDelete, modifier = Modifier)
                 if (books.isEmpty()) {
                     Text("Книг не существует в этой вселенной")
                 }
             }
-
         }
     }
-
-
 }
 
 @Composable
@@ -243,49 +241,94 @@ fun ThemeSwitcher(
     onLightThemeSelected: () -> Unit,
     onDarkThemeSelected: () -> Unit,
     onSystemThemeSelected: () -> Unit,
-    selectedTheme: String
+    currentTheme: Theme
 ) {
-    Row(
+
+    Box(
         modifier = Modifier
             .padding(16.dp)
             .clip(RoundedCornerShape(50))
+            .drawWithContent {
+                drawContent() // Рисует содержимое Box
+                drawRoundRect( // Рисует границу поверх
+                    color = Color.Black,
+                    size = size,
+                    cornerRadius = CornerRadius(size.height / 2, size.height / 2), // Овал
+                    style = Stroke(width = 2.dp.toPx()) // Толщина границы
+                )
+            }
             .background(Color.Gray)
             .height(48.dp)
             .fillMaxWidth()
+
     ) {
-        Button(
-            onClick = onLightThemeSelected,
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxHeight(),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = if (selectedTheme == "Light") Color.Yellow else Color.White
-            )
+        Row(
+            modifier = Modifier.fillMaxSize()
         ) {
-            Text("Light")
-        }
-        Button(
-            onClick = onDarkThemeSelected,
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxHeight(),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = if (selectedTheme == "Dark") Color.Yellow else Color.Black
+            CustomButton(
+                text = "Light",
+                isSelected = currentTheme == Theme.LIGHT,
+                onClick = onLightThemeSelected,
+                modifier = Modifier.weight(1f),
+                theme = currentTheme
             )
-        ) {
-            Text("Dark", color = Color.White)
-        }
-        Button(
-            onClick = onSystemThemeSelected,
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxHeight(),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = if (selectedTheme == "System") Color.Yellow else Color.LightGray
+            HorizontalDivider(color = Color.Black, modifier = Modifier.fillMaxHeight().width(1.dp))
+            CustomButton(
+                text = "Dark",
+                isSelected = currentTheme == Theme.DARK,
+                onClick = onDarkThemeSelected,
+                modifier = Modifier.weight(1f),
+                theme = currentTheme
             )
-        ) {
-            Text("System")
+            HorizontalDivider(color = Color.Black, modifier = Modifier.fillMaxHeight().width(1.dp))
+            CustomButton(
+                text = "System",
+                isSelected = currentTheme == Theme.SYSTEM,
+                onClick = onSystemThemeSelected,
+                modifier = Modifier.weight(1f),
+                theme = currentTheme            )
         }
+    }
+}
+
+@Composable
+fun CustomButton(
+    text: String,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier,
+    theme: Theme
+) {
+
+    var currentTheme = theme
+
+    if (currentTheme == Theme.SYSTEM) {
+        if (isSystemInDarkTheme()) currentTheme = Theme.DARK
+        else currentTheme = Theme.LIGHT
+    }
+
+    val backgroundColor = when {
+        isSelected && currentTheme == Theme.LIGHT -> Color.DarkGray
+        isSelected && currentTheme == Theme.DARK -> Color.LightGray
+        !isSelected && currentTheme == Theme.LIGHT -> Color.LightGray
+        else -> Color.DarkGray
+    }
+
+    val textColor = when {
+        isSelected && currentTheme == Theme.LIGHT -> Color.LightGray
+        isSelected && currentTheme == Theme.DARK -> Color.DarkGray
+        !isSelected && currentTheme == Theme.LIGHT -> Color.DarkGray
+        else -> Color.LightGray
+    }
+
+    Box(
+        modifier = modifier
+            .fillMaxHeight()
+            .clickable(onClick = onClick)
+            .background(backgroundColor),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(text, color = textColor) // Используем цвет текста в зависимости от темы
     }
 }
 

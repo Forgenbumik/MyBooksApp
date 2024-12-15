@@ -11,6 +11,9 @@ import kotlinx.coroutines.launch
 
 class AppViewModel(application: Application) : AndroidViewModel(application) {
 
+    private val _currentTheme = MutableStateFlow(Theme.SYSTEM)
+    val currentTheme: StateFlow<Theme> = _currentTheme
+
     private val _books = MutableStateFlow<List<Book>>(emptyList())
     val books: StateFlow<List<Book>> = _books.asStateFlow()
 
@@ -23,6 +26,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     init {
         // Загрузка всех книг при инициализации ViewModel
         loadBooks()
+    }
+
+    fun setTheme(theme: Theme) {
+        _currentTheme.value = theme
     }
 
     fun loadBooks() {
@@ -52,13 +59,6 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun addBook(book: Book) {
         viewModelScope.launch(Dispatchers.IO) {
             databaseHelper.value.addBook(book)
-            loadBooks()
-        }
-    }
-
-    fun deleteBook(bookId: Long) {
-        viewModelScope.launch(Dispatchers.IO) {
-            databaseHelper.value.deleteBook(bookId)
             loadBooks()
         }
     }
