@@ -20,8 +20,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
-    private var databaseHelper = MutableStateFlow<DatabaseHelper>(DatabaseHelper(application.applicationContext))
-    val helper: StateFlow<DatabaseHelper> = databaseHelper.asStateFlow()
+    private val databaseHelper = DatabaseHelper(application.applicationContext)
 
     init {
         // Загрузка всех книг при инициализации ViewModel
@@ -34,7 +33,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun loadBooks() {
         viewModelScope.launch(Dispatchers.IO) {
-            val allBooks = helper.value.getAllBooks()
+            val allBooks = databaseHelper.getAllBooks()
             _books.value = allBooks
         }
     }
@@ -46,7 +45,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun filterBooks(query: String) {
         viewModelScope.launch(Dispatchers.IO) {
-            val allBooks = databaseHelper.value.getAllBooks()
+            val allBooks = databaseHelper.getAllBooks()
             val filteredBooks = if (query.isBlank()) {
                 allBooks
             } else {
@@ -58,7 +57,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun addBook(book: Book) {
         viewModelScope.launch(Dispatchers.IO) {
-            databaseHelper.value.addBook(book)
+            databaseHelper.addBook(book)
             loadBooks()
         }
     }
